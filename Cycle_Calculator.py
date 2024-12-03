@@ -57,4 +57,5 @@ def cycle_calculator(bypass, m_dot_c_isa, pi_fan, pi_hpc, pi_comb, T_04, pi_tot,
     m_dot_c2 = m_dot_c + m_dot_fuel
     p_04 = P_0_3 * pi_comb
 
+    # Continue
     return eta_comb, eta_th, eta_jet, eta_prop, eta_tot
