@@ -1,7 +1,7 @@
 # This file calculates the efficiencies of a turbofan engine to then plot a sankey diagram
 # Authors: Alfonso Rato, Jakub Bartmański 
 
-def cycle_calculator(bypass, m_dot_c_isa, pi_fan, pi_hpc, T_04, pi_tot, eta_intake, eta_fan, eta_LPC, eta_HPC, eta_LPT, eta_HPT, eta_combustor):
+def cycle_calculator(bypass, m_dot_c_isa, pi_fan, pi_hpc, pi_comb, T_04, pi_tot, eta_intake, eta_fan, eta_LPC, eta_HPC, eta_LPT, eta_HPT, eta_combustor, LHV):
     # Constants
     cp_air = 1000 
     kappa_air = 1.4
@@ -52,6 +52,9 @@ def cycle_calculator(bypass, m_dot_c_isa, pi_fan, pi_hpc, T_04, pi_tot, eta_inta
     T_0_3 = T_0_25 * (1 + 1/eta_HPC * (pi_hpc**((kappa_air - 1) / kappa_air) - 1))
 
     # Combustor 3 -> 4
-    T_04 = T_4
+    T_04 = T_04
+    m_dot_fuel = (m_dot_c * cp_gas * (T_04 - T_0_3)) / (eta_combustor * LHV)
+    m_dot_c2 = m_dot_c + m_dot_fuel
+    p_04 = P_0_3 * pi_comb
 
     return eta_comb, eta_th, eta_jet, eta_prop, eta_tot
