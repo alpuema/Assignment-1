@@ -13,7 +13,7 @@ def cycle_calculator(bypass, m_dot_c_isa, pi_fan, pi_hpc, pi_comb, T_04, pi_tot,
     P = 23842
     T_isa = 288.15
     P_isa = 101325
-
+    R_air = 287
     # Calculate pressure ratio acroos LPC from total pressure ratio
 
     pi_lpc = pi_tot / (pi_fan * pi_hpc)
