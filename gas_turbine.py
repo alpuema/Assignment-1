@@ -88,6 +88,9 @@ class GasTurbine(object):
         P_0_21 = P_0_2 * pi_fan
         T_0_21 = T_0_2 * (1 + 1/eta_isen_comp * (pi_fan**((kappa_air - 1) / kappa_air) - 1))
 
+        # Work of fan
+        W_dot_fan = (m_dot_core + m_dot_bp) * kappa_air * (T_0_21 - T_0_2)
+
         # Bypass 2 -> 13
         P_0_13 = P_0_21
         T_0_13 = T_0_21
@@ -124,13 +127,13 @@ class GasTurbine(object):
         # LPT 44 -> 5
 
         # Work of LPT
-        W_dot_LPT = W_dot_LPC / eta_mech
+        W_dot_LPT = (W_dot_LPC + W_dot_fan) / eta_mech
 
         # Rest of LPT
         T_0_5 = T_0_44 - W_dot_LPT / (m_dot_core_tot * kappa_gas)
         P_0_5 = P_0_44 * (1 - (1 / eta_isen_turb) * (1 - T_0_5 / T_0_44)) ** (kappa_gas / (kappa_gas - 1))
 
-        # The nozzle. First, check if the nozzle is choked.
+        # The core nozzle. First, check if the nozzle is choked.
 
         # Critical pressure ratio
         pi_nozzle_crit = (1 - (1 / eta_isen_nozzle) * ((kappa_gas - 1) / (kappa_gas + 1))) ** (-kappa_gas / (kappa_gas - 1))
@@ -142,8 +145,46 @@ class GasTurbine(object):
         self.is_nozzle_choked = pi_nozzle_real > pi_nozzle_crit
         is_nozzle_choked = self.is_nozzle_choked
 
-        print(f"Is nozzle choked: {is_nozzle_choked}")
-        return 
+        # Only continue if the nozzle is choked. Otherwise raise NotImplementedError
+        if not is_nozzle_choked:
+            raise NotImplementedError("The nozzle is not choked. The calculations are not implemented for this case. Aborting.")
+        
+        # Exit of the nozzle. Note these are static values!
+        P_8 = P_0_5 / pi_nozzle_crit
+        T_8 = T_0_5 * 2 / (kappa_gas + 1)
+        rho_8 = P_8 / (R_AIR * T_8)
+        V_8 = (kappa_gas * R_AIR * T_8) ** 0.5
+        A_8 = m_dot_core_tot / (rho_8 * V_8)
+
+        # Jet effective velocity of the nozzle
+        V_8_eff = V_8 + (P_8 - P_0) / (rho_8 * V_8)
+
+        # Now do the same for bypass (nozzle) (station 18)
+
+        # Critical pressure ratio
+        pi_bp_crit = (1 - (1 / eta_isen_nozzle) * ((kappa_air - 1) / (kappa_air + 1))) ** (-kappa_air / (kappa_air - 1))
+
+        # Real pressure ratio
+        pi_bp_real = P_0_13 / P_0
+
+        # Assign a flag if the bypass nozzle is choked
+        self.is_bp_choked = pi_bp_real > pi_bp_crit
+        is_bp_choked = self.is_bp_choked
+
+        # Only continue if the bypass nozzle is choked. Otherwise raise NotImplementedError
+        if not is_bp_choked:
+            raise NotImplementedError("The bypass nozzle is not choked. The calculations are not implemented for this case. Aborting.")
+        
+        # Exit of the bypass nozzle. Note these are static values!
+        P_18 = P_0_13 / pi_bp_crit
+        T_18 = T_0_13 * 2 / (kappa_air + 1)
+        rho_18 = P_18 / (R_AIR * T_18)
+        V_18 = (kappa_air * R_AIR * T_18) ** 0.5
+        A_18 = m_dot_bp / (rho_18 * V_18)
+
+        # Jet effective velocity of the bypass nozzle
+        V_18_eff = V_18 + (P_18 - P_0) / (rho_18 * V_18)
+        
         # return eta_comb, eta_th, eta_jet, eta_prop, eta_tot
     
 class GasTurbineData(object):
@@ -213,7 +254,7 @@ if __name__ == """__main__""":
         'P_0': 23842    # Pa
     } # TODO: WE'RE NOT USING ALTIDUTE?
 
-    type = 'leap1b'
+    type = 'jt8d'
 
     # Get data for appropriate engine type
     data = GasTurbineData().get(type)
