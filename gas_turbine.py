@@ -1,7 +1,10 @@
 # This file calculates the efficiencies of a turbofan engine to then plot a sankey diagram
 # Authors: Alfonso Rato, Jakub Bartmański
 import inspect
+import numpy as np
+import matplotlib.pyplot as plt
 from typing import Literal
+from matplotlib.sankey import Sankey
 
 class GasTurbine(object):
    
@@ -40,13 +43,23 @@ class GasTurbine(object):
         self.kappa_air = kappa_air
         self.cp_gas = cp_gas
         self.kappa_gas = kappa_gas
+
+        # Resolved flag
+        self.__is_resolved = False
+
+        # Efficiencies
+        self.__efficiencies = None
         
     def resolve(self, \
                 bpr, \
                 m_dot_core_isa, \
                 pi_fan, pi_hpc, pi_comb, opr, \
                 eta_mech, eta_isen_intake, eta_isen_comp, eta_combustor, eta_isen_turb, eta_isen_nozzle, \
-                T_0_4, LHV):
+                T_0_4, LHV, *, \
+                verbose=True):
+        
+        # Assert that the GasTurbine object is not resolved
+        assert not self.__is_resolved, "GasTurbine object is already resolved. Create a new object or reset the current one."
 
         # Retrieve the constants and attributes
         T_0_ISA = GasTurbine.T_0_ISA
@@ -86,7 +99,7 @@ class GasTurbine(object):
 
         # Fan 2 -> 21
         P_0_21 = P_0_2 * pi_fan
-        T_0_21 = T_0_2 * (1 + 1/eta_isen_comp * (pi_fan**((kappa_air - 1) / kappa_air) - 1))
+        T_0_21 = T_0_2 * (1 + 1 / eta_isen_comp * (pi_fan**((kappa_air - 1) / kappa_air) - 1))
 
         # Work of fan
         W_dot_fan = (m_dot_core + m_dot_bp) * kappa_air * (T_0_21 - T_0_2)
@@ -144,17 +157,33 @@ class GasTurbine(object):
         # Assign a flag if the nozzle is choked
         self.is_nozzle_choked = pi_nozzle_real > pi_nozzle_crit
         is_nozzle_choked = self.is_nozzle_choked
-
-        # Only continue if the nozzle is choked. Otherwise raise NotImplementedError
-        if not is_nozzle_choked:
-            raise NotImplementedError("The nozzle is not choked. The calculations are not implemented for this case. Aborting.")
         
-        # Exit of the nozzle. Note these are static values!
-        P_8 = P_0_5 / pi_nozzle_crit
-        T_8 = T_0_5 * 2 / (kappa_gas + 1)
-        rho_8 = P_8 / (R_AIR * T_8)
-        V_8 = (kappa_gas * R_AIR * T_8) ** 0.5
-        A_8 = m_dot_core_tot / (rho_8 * V_8)
+        # Exit of the nozzle
+
+        # Choked case
+        if is_nozzle_choked:
+
+            if verbose:
+                print("Core nozzle is choked.")
+
+            # Note these are static values! 
+            P_8 = P_0_5 / pi_nozzle_crit
+            T_8 = T_0_5 * 2 / (kappa_gas + 1)
+            rho_8 = P_8 / (R_AIR * T_8)
+            V_8 = (kappa_gas * R_AIR * T_8) ** 0.5
+            A_8 = m_dot_core_tot / (rho_8 * V_8)
+
+        # Unchoked case
+        else:
+
+            if verbose:
+                print("Core nozzle is unchoked.")
+        
+            P_8 = P_0
+            T_8 = T_0_5 * (1 - eta_isen_nozzle * (1 - (P_0 / P_0_5) ** ((kappa_gas - 1) / kappa_gas)))
+            rho_8 = P_8 / (R_AIR * T_8)
+            V_8 = (2 * cp_gas * (T_0_5 - T_8)) ** 0.5
+            A_8 = m_dot_core_tot / (rho_8 * V_8)
 
         # Jet effective velocity of the nozzle
         V_8_eff = V_8 + (P_8 - P_0) / (rho_8 * V_8)
@@ -170,23 +199,156 @@ class GasTurbine(object):
         # Assign a flag if the bypass nozzle is choked
         self.is_bp_choked = pi_bp_real > pi_bp_crit
         is_bp_choked = self.is_bp_choked
-
-        # Only continue if the bypass nozzle is choked. Otherwise raise NotImplementedError
-        if not is_bp_choked:
-            raise NotImplementedError("The bypass nozzle is not choked. The calculations are not implemented for this case. Aborting.")
         
-        # Exit of the bypass nozzle. Note these are static values!
-        P_18 = P_0_13 / pi_bp_crit
-        T_18 = T_0_13 * 2 / (kappa_air + 1)
-        rho_18 = P_18 / (R_AIR * T_18)
-        V_18 = (kappa_air * R_AIR * T_18) ** 0.5
-        A_18 = m_dot_bp / (rho_18 * V_18)
+        # Exit of the bypass nozzle
+
+        # Choked case
+        if is_bp_choked:
+
+            if verbose:
+                print("Bypass nozzle is choked.")
+    
+            P_18 = P_0_13 / pi_bp_crit
+            T_18 = T_0_13 * 2 / (kappa_air + 1)
+            rho_18 = P_18 / (R_AIR * T_18)
+            V_18 = (kappa_air * R_AIR * T_18) ** 0.5
+            A_18 = m_dot_bp / (rho_18 * V_18)
+
+        # Unchoked case
+        else:
+
+            if verbose:
+                print("Bypass nozzle is unchoked.")
+
+            P_18 = P_0
+            T_18 = T_0_13 * (1 - eta_isen_nozzle * (1 - (P_0 / P_0_13) ** ((kappa_air - 1) / kappa_air)))
+            rho_18 = P_18 / (R_AIR * T_18)
+            V_18 = (2 * cp_air * (T_0_13 - T_18)) ** 0.5
+            A_18 = m_dot_bp / (rho_18 * V_18)
 
         # Jet effective velocity of the bypass nozzle
         V_18_eff = V_18 + (P_18 - P_0) / (rho_18 * V_18)
+
+        # Calculate gas generator power
+        W_dot_gg = m_dot_bp * kappa_air * (T_0_21 - T_0_2) # TODO
+
+        # Finally, calculate the efficiencies
+
+        # Combustion efficiency is given
+        eta_comb = eta_combustor
+
+        # Thermodynamic efficiency
+        eta_td = W_dot_gg / (m_dot_core * cp_gas * (T_0_4 - T_0_3))
+
+        # Jet efficiency
+        eta_jet = (0.5 * m_dot_bp * (V_18_eff ** 2 - V_0 ** 2) + 0.5 * m_dot_core_tot * (V_8_eff ** 2 - V_0 ** 2)) / W_dot_gg
+
+        # Propulsive efficiency
+        eta_prop = V_0 * (m_dot_bp * (V_18_eff - V_0) + m_dot_core_tot * (V_8_eff - V_0)) \
+                    / (0.5 * m_dot_bp * (V_18_eff ** 2 - V_0 ** 2) + 0.5 * m_dot_core_tot * (V_8_eff ** 2 - V_0 ** 2))
         
-        # return eta_comb, eta_th, eta_jet, eta_prop, eta_tot
+        # Thermal efficiency
+        eta_th = (0.5 * m_dot_bp * (V_18_eff ** 2 - V_0 ** 2) + 0.5 * m_dot_core_tot * (V_8_eff ** 2 - V_0 ** 2)) / (m_dot_fuel * LHV)
+
+        # Total efficiency
+        eta_tot = eta_th * eta_prop
+
+        # Store the efficiencies
+        self.__efficiencies = eta_comb, eta_td, eta_jet, eta_prop, eta_th, eta_tot
+
+        print(f"--------------\nCombustion efficiency: {eta_comb:.2f}\n")
+        print(f"Thermodynamic efficiency: {eta_td:.2f}")
+        print(f"Jet efficiency: {eta_jet:.2f}\n")
+        print(f"Propulsive efficiency: {eta_prop:.2f}")
+        print(f"Thermal efficiency: {eta_th:.2f}\n")
+        print(f"Total efficiency: {eta_tot:.2f}")
+
+
+        # Set the resolved flag
+        self.__is_resolved = True
+        
+        return eta_comb, eta_td, eta_jet, eta_prop, eta_th, eta_tot
     
+    def reset(self):     
+            # Reset the resolved flag
+            self.__is_resolved = False
+    
+            # Reset the efficiencies
+            self.__efficiencies = None
+
+    def draw_sankey(self):
+        
+        # Assert that the GasTurbine object is resolved
+        assert self.__is_resolved, "GasTurbine object must be resolved before drawing the sankey diagram. Call the resolve method first."
+
+        # Retrieve efficiencies values
+        eta_comb, eta_td, eta_jet, eta_prop, eta_th, eta_tot = self.__efficiencies
+
+        # Pack the values into numpy array in the order of the sankey diagram:
+        # eta_comb, eta_td, eta_jet, eta_prop
+        values = np.array([eta_comb, eta_td, eta_jet, eta_prop]) * 100
+
+        # Invert the values for the losses
+        values = 100 - values
+
+        # print(values)
+
+        fig = plt.figure(figsize=(8.3, 6))
+        ax = fig.add_subplot(1, 1, 1, xticks=[], yticks=[])
+        
+        # Define the flows and layout
+        sankey = Sankey(ax=ax, scale=0.011, head_angle=90, format='%.0f', unit='%')
+
+        # Add the flows with improved offsets and black outlines
+        sankey.add(flows=[100, -values[0], -values[1], -values[2], -values[3], values.sum() - 100],  # Positive = forward flow, negative = losses
+                labels=[None, None, None, None, None, None],  # Labels handled manually
+                orientations=[0, 1, 1, 1, 1, 0],  # -1 = downward, 0 = rightward
+                pathlengths=[0.5, 1., 1., 1., 1., 1.],  # Adjust lengths for separation
+                facecolor="#ffcccc",  # Light pink
+                edgecolor="black")   # Pure black outline
+
+        # Render the Sankey diagram
+        diagrams = sankey.finish()
+
+        # Construct labels from values
+        l1 = f"{values[0]:.1f}%"
+        l2 = f"{values[1]:.1f}%"
+        l3 = f"{values[2]:.1f}%"
+        l4 = f"{values[3]:.1f}%"
+        l5 = f"{100-values.sum():.1f}%"
+
+        # Manually add text in boxes
+        labels = [
+            ("Chemical Power", "100%"),
+            ("Incomplete\n Combustion", l1),
+            ("Heat Loss\n (Heat)", l2),
+            ("Heat Loss\n (Gas Power)", l3),
+            ("KE Loss", l4),
+            ("Thrust Power", l5)
+        ]
+
+        y_pos = 0.7
+        positions = [
+            (-0.69, 0.),     # Chemical Power
+            (0.4, y_pos),     # Incomplete Combustion
+            (1., y_pos),   # Heat Loss (Heat)
+            (1.4, y_pos),   # Heat Loss (Gas Power)
+            (1.8, y_pos),   # Kinetic Energy Loss
+            (2.6, -0.33)    # Thrust Power
+        ]
+
+        for (label, value), (x, y) in zip(labels, positions):
+            ax.text(
+                x, y, f"{label}\n{value}", 
+                bbox=dict(facecolor="white", edgecolor="black", boxstyle="round,pad=0.3"),
+                ha="center", va="center", fontsize=9
+            )
+
+        ax.title.set_fontsize(14)
+
+        plt.tight_layout()
+        plt.show()
+
 class GasTurbineData(object):
 
     def __init__(self):
@@ -262,3 +424,4 @@ if __name__ == """__main__""":
     # Create the GasTurbine object and resolve it
     gt = GasTurbine(**ambient)
     gt.resolve(**data)
+    # gt.draw_sankey()
