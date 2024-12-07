@@ -93,16 +93,22 @@ class GasTurbine(object):
         T_0_0 = T_0 * (1 + (kappa_air - 1) / 2 * M_0 ** 2)
         P_0_0 = P_0 * (1 + (kappa_air - 1) / 2 * M_0 ** 2) ** (kappa_air / (kappa_air - 1))
 
+        # print(f"--------------\nFreestream conditions:\nT_00: {T_0_0:.2f} K\nP_00: {P_0_0:.2f} Pa\n")
+
         # Inlet 0 -> 2
         P_0_2 = P_0 * (1 + eta_isen_intake * (kappa_air - 1) / 2 * M_0 ** 2) ** (kappa_air / (kappa_air - 1))
         T_0_2 = T_0_0
 
+        # print(f"--------------\nInlet conditions:\nT_02: {T_0_2:.2f} K\nP_02: {P_0_2:.2f} Pa\n")
+
         # Fan 2 -> 21
         P_0_21 = P_0_2 * pi_fan
-        T_0_21 = T_0_2 * (1 + 1 / eta_isen_comp * (pi_fan**((kappa_air - 1) / kappa_air) - 1))
+        T_0_21 = T_0_2 * (1 + 1 / eta_isen_comp * (pi_fan ** ((kappa_air - 1) / kappa_air) - 1))
+
+        # print(f"--------------\nFan conditions:\nT_021: {T_0_21:.2f} K\nP_021: {P_0_21:.2f} Pa\n")
 
         # Work of fan
-        W_dot_fan = (m_dot_core + m_dot_bp) * kappa_air * (T_0_21 - T_0_2)
+        W_dot_fan = (m_dot_core + m_dot_bp) * cp_air * (T_0_21 - T_0_2)
 
         # Bypass 2 -> 13
         P_0_13 = P_0_21
@@ -112,15 +118,19 @@ class GasTurbine(object):
         P_0_25 = P_0_21 * pi_lpc
         T_0_25 = T_0_21 * (1 + 1 / eta_isen_comp * (pi_lpc ** ((kappa_air - 1) / kappa_air) - 1))
 
+        # print(f"--------------\nLPC conditions:\nT_025: {T_0_25:.2f} K\nP_025: {P_0_25:.2f} Pa\n")
+
         # Work of LPC
-        W_dot_LPC = m_dot_core * kappa_air * (T_0_25 - T_0_21)
+        W_dot_LPC = m_dot_core * cp_air * (T_0_25 - T_0_21)
 
         # HPC 25 -> 3
         P_0_3 = P_0_25 * pi_hpc
         T_0_3 = T_0_25 * (1 + 1 / eta_isen_comp * (pi_hpc ** ((kappa_air - 1) / kappa_air) - 1))
 
+        # print(f"--------------\nHPC conditions:\nT_03: {T_0_3:.2f} K\nP_03: {P_0_3:.2f} Pa\n")
+
         # Work of HPC
-        W_dot_HPC = m_dot_core * kappa_air * (T_0_3 - T_0_25)
+        W_dot_HPC = m_dot_core * cp_air * (T_0_3 - T_0_25)
 
         # Combustor 3 -> 4
         # The stagnation temperature at the outlet of CC: T_0_4 which is given
@@ -128,14 +138,18 @@ class GasTurbine(object):
         m_dot_core_tot = m_dot_core + m_dot_fuel
         P_0_4 = P_0_3 * pi_comb
 
+        # print(f"--------------\nCombustor conditions:\nT_04: {T_0_4:.2f} K\nP_04: {P_0_4:.2f} Pa\n")
+
         # HPT 4 -> 44
 
         # Work of HPT
         W_dot_HPT = W_dot_HPC / eta_mech
 
         # Rest of HPT
-        T_0_44 = T_0_4 - W_dot_HPT / (m_dot_core_tot * kappa_gas)
+        T_0_44 = T_0_4 - W_dot_HPT / (m_dot_core_tot * cp_gas)
         P_0_44 = P_0_4 * (1 - (1 / eta_isen_turb) * (1 - T_0_44 / T_0_4)) ** (kappa_gas / (kappa_gas - 1))
+
+        # print(f"--------------\nHPT conditions:\nT_044: {T_0_44:.2f} K\nP_044: {P_0_44:.2f} Pa\n")
 
         # LPT 44 -> 5
 
@@ -143,7 +157,7 @@ class GasTurbine(object):
         W_dot_LPT = (W_dot_LPC + W_dot_fan) / eta_mech
 
         # Rest of LPT
-        T_0_5 = T_0_44 - W_dot_LPT / (m_dot_core_tot * kappa_gas)
+        T_0_5 = T_0_44 - W_dot_LPT / (m_dot_core_tot * cp_gas)
         P_0_5 = P_0_44 * (1 - (1 / eta_isen_turb) * (1 - T_0_5 / T_0_44)) ** (kappa_gas / (kappa_gas - 1))
 
         # The core nozzle. First, check if the nozzle is choked.
@@ -230,7 +244,10 @@ class GasTurbine(object):
         V_18_eff = V_18 + (P_18 - P_0) / (rho_18 * V_18)
 
         # Calculate gas generator power
-        W_dot_gg = m_dot_bp * kappa_air * (T_0_21 - T_0_2) # TODO
+        W_dot_fan_core = m_dot_core * cp_air * (T_0_21 - T_0_2)
+        T_0_g = (W_dot_fan_core + W_dot_LPC) / (m_dot_core_tot * cp_gas * eta_mech)
+        P_0_g = P_0_44 * (1 - ((1 - T_0_g / T_0_44) / eta_isen_turb)) ** (kappa_gas / (kappa_gas - 1))
+        W_dot_gg = m_dot_core_tot * cp_gas * T_0_g * (1 - (P_0 / P_0_g) ** ((1- kappa_gas) / kappa_gas))# TODO
 
         # Finally, calculate the efficiencies
 
@@ -416,6 +433,7 @@ if __name__ == """__main__""":
         'P_0': 23842    # Pa
     } # TODO: WE'RE NOT USING ALTIDUTE?
 
+    # type = 'leap1b'
     type = 'jt8d'
 
     # Get data for appropriate engine type
