@@ -93,19 +93,13 @@ class GasTurbine(object):
         T_0_0 = T_0 * (1 + (kappa_air - 1) / 2 * M_0 ** 2)
         P_0_0 = P_0 * (1 + (kappa_air - 1) / 2 * M_0 ** 2) ** (kappa_air / (kappa_air - 1))
 
-        # print(f"--------------\nFreestream conditions:\nT_00: {T_0_0:.2f} K\nP_00: {P_0_0:.2f} Pa\n")
-
         # Inlet 0 -> 2
         P_0_2 = P_0 * (1 + eta_isen_intake * (kappa_air - 1) / 2 * M_0 ** 2) ** (kappa_air / (kappa_air - 1))
         T_0_2 = T_0_0
 
-        # print(f"--------------\nInlet conditions:\nT_02: {T_0_2:.2f} K\nP_02: {P_0_2:.2f} Pa\n")
-
         # Fan 2 -> 21
         P_0_21 = P_0_2 * pi_fan
         T_0_21 = T_0_2 * (1 + 1 / eta_isen_comp * (pi_fan ** ((kappa_air - 1) / kappa_air) - 1))
-
-        # print(f"--------------\nFan conditions:\nT_021: {T_0_21:.2f} K\nP_021: {P_0_21:.2f} Pa\n")
 
         # Work of fan
         W_dot_fan = (m_dot_core + m_dot_bp) * cp_air * (T_0_21 - T_0_2)
@@ -118,16 +112,12 @@ class GasTurbine(object):
         P_0_25 = P_0_21 * pi_lpc
         T_0_25 = T_0_21 * (1 + 1 / eta_isen_comp * (pi_lpc ** ((kappa_air - 1) / kappa_air) - 1))
 
-        # print(f"--------------\nLPC conditions:\nT_025: {T_0_25:.2f} K\nP_025: {P_0_25:.2f} Pa\n")
-
         # Work of LPC
         W_dot_LPC = m_dot_core * cp_air * (T_0_25 - T_0_21)
 
         # HPC 25 -> 3
         P_0_3 = P_0_25 * pi_hpc
         T_0_3 = T_0_25 * (1 + 1 / eta_isen_comp * (pi_hpc ** ((kappa_air - 1) / kappa_air) - 1))
-
-        # print(f"--------------\nHPC conditions:\nT_03: {T_0_3:.2f} K\nP_03: {P_0_3:.2f} Pa\n")
 
         # Work of HPC
         W_dot_HPC = m_dot_core * cp_air * (T_0_3 - T_0_25)
@@ -138,8 +128,6 @@ class GasTurbine(object):
         m_dot_core_tot = m_dot_core + m_dot_fuel
         P_0_4 = P_0_3 * pi_comb
 
-        # print(f"--------------\nCombustor conditions:\nT_04: {T_0_4:.2f} K\nP_04: {P_0_4:.2f} Pa\n")
-
         # HPT 4 -> 44
 
         # Work of HPT
@@ -148,8 +136,6 @@ class GasTurbine(object):
         # Rest of HPT
         T_0_44 = T_0_4 - W_dot_HPT / (m_dot_core_tot * cp_gas)
         P_0_44 = P_0_4 * (1 - (1 / eta_isen_turb) * (1 - T_0_44 / T_0_4)) ** (kappa_gas / (kappa_gas - 1))
-
-        # print(f"--------------\nHPT conditions:\nT_044: {T_0_44:.2f} K\nP_044: {P_0_44:.2f} Pa\n")
 
         # LPT 44 -> 5
 
@@ -220,7 +206,7 @@ class GasTurbine(object):
         if is_bp_choked:
 
             if verbose:
-                print("Bypass nozzle is choked.")
+                print("Bypass nozzle is choked.\n")
     
             P_18 = P_0_13 / pi_bp_crit
             T_18 = T_0_13 * 2 / (kappa_air + 1)
@@ -232,7 +218,7 @@ class GasTurbine(object):
         else:
 
             if verbose:
-                print("Bypass nozzle is unchoked.")
+                print("Bypass nozzle is unchoked.\n")
 
             P_18 = P_0
             T_18 = T_0_13 * (1 - eta_isen_nozzle * (1 - (P_0 / P_0_13) ** ((kappa_air - 1) / kappa_air)))
@@ -243,11 +229,15 @@ class GasTurbine(object):
         # Jet effective velocity of the bypass nozzle
         V_18_eff = V_18 + (P_18 - P_0) / (rho_18 * V_18)
 
-        # Calculate gas generator power
-        W_dot_fan_core = m_dot_core * cp_air * (T_0_21 - T_0_2)
-        T_0_g = (W_dot_fan_core + W_dot_LPC) / (m_dot_core_tot * cp_gas * eta_mech)
-        P_0_g = P_0_44 * (1 - ((1 - T_0_g / T_0_44) / eta_isen_turb)) ** (kappa_gas / (kappa_gas - 1))
-        W_dot_gg = m_dot_core_tot * cp_gas * T_0_g * (1 - (P_0 / P_0_g) ** ((1- kappa_gas) / kappa_gas))# TODO
+        # Calculate gas generator power; TODO
+        # W_dot_fan_core = m_dot_core * cp_air * (T_0_21 - T_0_2)
+        # T_0_g = (W_dot_fan_core + W_dot_LPC) / (m_dot_core_tot * cp_gas * eta_mech)
+        # P_0_g = P_0_44 * (1 - ((1 - T_0_g / T_0_44) / eta_isen_turb)) ** (kappa_gas / (kappa_gas - 1))
+        # W_dot_gg = m_dot_core_tot * cp_gas * T_0_g * (1 - (P_0 / P_0_g) ** ((1- kappa_gas) / kappa_gas))
+        T_0_g = T_0_44 - W_dot_LPC / (m_dot_core_tot * cp_gas * eta_mech)
+        P_0_g = P_0_44 * (1 - (1 / eta_isen_turb) * (1 - T_0_g / T_0_44)) ** (kappa_gas / (kappa_gas - 1))
+        T_0_8_isen = T_0_g * (P_0_0 / P_0_g) ** ((kappa_gas - 1) / kappa_gas)
+        W_dot_gg = m_dot_core_tot * cp_gas * (T_0_g - T_0_8_isen)
 
         # Finally, calculate the efficiencies
 
@@ -273,13 +263,14 @@ class GasTurbine(object):
         # Store the efficiencies
         self.__efficiencies = eta_comb, eta_td, eta_jet, eta_prop, eta_th, eta_tot
 
-        print(f"--------------\nCombustion efficiency: {eta_comb:.2f}\n")
-        print(f"Thermodynamic efficiency: {eta_td:.2f}")
-        print(f"Jet efficiency: {eta_jet:.2f}\n")
-        print(f"Propulsive efficiency: {eta_prop:.2f}")
-        print(f"Thermal efficiency: {eta_th:.2f}\n")
-        print(f"Total efficiency: {eta_tot:.2f}")
-
+        if verbose:
+            print(f"Resolved GasTurbine object with the following efficiencies:")
+            print(f"Combustion efficiency: {eta_comb:.5f}")
+            print(f"Thermodynamic efficiency: {eta_td:.5f}")
+            print(f"Jet efficiency: {eta_jet:.5f}")
+            print(f"Propulsive efficiency: {eta_prop:.5f}")
+            print(f"Thermal efficiency: {eta_th:.5f}")
+            print(f"Total efficiency: {eta_tot:.5f}")
 
         # Set the resolved flag
         self.__is_resolved = True
@@ -293,10 +284,13 @@ class GasTurbine(object):
             # Reset the efficiencies
             self.__efficiencies = None
 
-    def draw_sankey(self):
+    def draw_sankey(self, type: Literal['jt8d', 'leap1b'], *, save: bool=True):
         
         # Assert that the GasTurbine object is resolved
         assert self.__is_resolved, "GasTurbine object must be resolved before drawing the sankey diagram. Call the resolve method first."
+
+        # Assert that the type is either 'jt8d' or 'leap1b'
+        assert type in ['jt8d', 'leap1b'], f"Engine type '{type}' not found in GasTurbineData"
 
         # Retrieve efficiencies values
         eta_comb, eta_td, eta_jet, eta_prop, eta_th, eta_tot = self.__efficiencies
@@ -320,7 +314,7 @@ class GasTurbine(object):
         sankey.add(flows=[100, -values[0], -values[1], -values[2], -values[3], values.sum() - 100],  # Positive = forward flow, negative = losses
                 labels=[None, None, None, None, None, None],  # Labels handled manually
                 orientations=[0, 1, 1, 1, 1, 0],  # -1 = downward, 0 = rightward
-                pathlengths=[0.5, 1., 1., 1., 1., 1.],  # Adjust lengths for separation
+                pathlengths=[0.5, 1., 1., 1.5, 1.5, 1.],  # Adjust lengths for separation
                 facecolor="#ffcccc",  # Light pink
                 edgecolor="black")   # Pure black outline
 
@@ -336,7 +330,7 @@ class GasTurbine(object):
 
         # Manually add text in boxes
         labels = [
-            ("Chemical Power", "100%"),
+            ("Chemical\n Power", "100%"),
             ("Incomplete\n Combustion", l1),
             ("Heat Loss\n (Heat)", l2),
             ("Heat Loss\n (Gas Power)", l3),
@@ -344,14 +338,26 @@ class GasTurbine(object):
             ("Thrust Power", l5)
         ]
 
-        y_pos = 0.7
+        # Store the x-positions of the labels
+        x_pos_jt8d = [-0.69, 0.4, 1., 1.4, 1.8, 2.6]
+        x_pos_leap1b = [-0.69, 0.4, 0.957, 1.46, 1.935, 2.6]
+
+        # Choose the x-position based on the engine type
+        x_pos = x_pos_jt8d if type == 'jt8d' else x_pos_leap1b
+
+        # y-position of the labels is fixed
+        y_pos = 0.9
+
+        # y-pos of thrust label
+        y_pos_thrust = -0.4 if type == 'jt8d' else -0.43
+    
         positions = [
-            (-0.69, 0.),     # Chemical Power
-            (0.4, y_pos),     # Incomplete Combustion
-            (1., y_pos),   # Heat Loss (Heat)
-            (1.4, y_pos),   # Heat Loss (Gas Power)
-            (1.8, y_pos),   # Kinetic Energy Loss
-            (2.6, -0.33)    # Thrust Power
+            (x_pos[0], 0.),     # Chemical Power
+            (x_pos[1], y_pos),     # Incomplete Combustion
+            (x_pos[2], y_pos),   # Heat Loss (Heat)
+            (x_pos[3], y_pos),   # Heat Loss (Gas Power)
+            (x_pos[4], y_pos),   # Kinetic Energy Loss
+            (x_pos[5], y_pos_thrust)    # Thrust Power
         ]
 
         for (label, value), (x, y) in zip(labels, positions):
@@ -361,9 +367,12 @@ class GasTurbine(object):
                 ha="center", va="center", fontsize=9
             )
 
-        ax.title.set_fontsize(14)
-
         plt.tight_layout()
+
+        # Save the figure
+        if save:
+            fig.savefig(f"sankey_{type}.pdf")
+
         plt.show()
 
 class GasTurbineData(object):
@@ -433,8 +442,7 @@ if __name__ == """__main__""":
         'P_0': 23842    # Pa
     } # TODO: WE'RE NOT USING ALTIDUTE?
 
-    # type = 'leap1b'
-    type = 'jt8d'
+    type = 'leap1b'
 
     # Get data for appropriate engine type
     data = GasTurbineData().get(type)
@@ -442,4 +450,4 @@ if __name__ == """__main__""":
     # Create the GasTurbine object and resolve it
     gt = GasTurbine(**ambient)
     gt.resolve(**data)
-    # gt.draw_sankey()
+    gt.draw_sankey(type)
