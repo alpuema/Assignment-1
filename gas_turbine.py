@@ -229,7 +229,7 @@ class GasTurbine(object):
         # Jet effective velocity of the bypass nozzle
         V_18_eff = V_18 + (P_18 - P_0) / (rho_18 * V_18)
 
-        # Calculate gas generator power; TODO
+        # Calculate gas generator power; 
         # W_dot_fan_core = m_dot_core * cp_air * (T_0_21 - T_0_2)
         # T_0_g = (W_dot_fan_core + W_dot_LPC) / (m_dot_core_tot * cp_gas * eta_mech)
         # P_0_g = P_0_44 * (1 - ((1 - T_0_g / T_0_44) / eta_isen_turb)) ** (kappa_gas / (kappa_gas - 1))
@@ -298,9 +298,19 @@ class GasTurbine(object):
         # Pack the values into numpy array in the order of the sankey diagram:
         # eta_comb, eta_td, eta_jet, eta_prop
         values = np.array([eta_comb, eta_td, eta_jet, eta_prop]) * 100
+        
+
+
+        
 
         # Invert the values for the losses
         values = 100 - values
+        print(values)
+        # Normalize the values so they refer to the input energy
+
+        values[1] = values[1] * (1-values[0]/100)
+        values[2] = values[2] * (1-values[0]/100-values[1]/100)
+        values[3] = values[3] * (1-values[0]/100-values[1]/100-values[2]/100)
 
         # print(values)
 
