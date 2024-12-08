@@ -298,21 +298,15 @@ class GasTurbine(object):
         # Pack the values into numpy array in the order of the sankey diagram:
         # eta_comb, eta_td, eta_jet, eta_prop
         values = np.array([eta_comb, eta_td, eta_jet, eta_prop]) * 100
-        
-
-
-        
 
         # Invert the values for the losses
         values = 100 - values
-        print(values)
+
         # Normalize the values so they refer to the input energy
 
         values[1] = values[1] * (1-values[0]/100)
         values[2] = values[2] * (1-values[0]/100-values[1]/100)
         values[3] = values[3] * (1-values[0]/100-values[1]/100-values[2]/100)
-
-        # print(values)
 
         fig = plt.figure(figsize=(8.3, 6))
         ax = fig.add_subplot(1, 1, 1, xticks=[], yticks=[])
@@ -422,7 +416,7 @@ class GasTurbineData(object):
             'eta_isen_comp': 0.92,    # -
             'eta_isen_turb': 0.92,    # -
             'eta_combustor': 0.995    # -
-        } # TODO: WE'RE NOT USING STAGE INFO OR ENGINE DIAMETER?
+        } 
 
         # # Check if jt8d dictionary keys are all the same as position arguments of GasTurbine.resolve
         # for key in inspect.signature(GasTurbine.resolve).parameters:
